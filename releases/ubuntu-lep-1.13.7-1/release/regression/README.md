@@ -7,9 +7,12 @@ the issue it covers is fixed. `lib/` holds shared helpers and is not run
 directly.
 
 The checks and `lib/` are copied from CyloTech/rutorrent-app branch
-php72-multipart-fix (e5de63e2). `lib/fpm.sh` differs in one place: this image
+php72-multipart-fix (e5de63e2). `lib/fpm.sh` differs in two places. This image
 has no `nginx` user, so the private php-fpm7.2 pool runs as `www-data` when
-`nginx` does not exist.
+`nginx` does not exist. The private
+php-fpm7.2 master starts with `-d zend.assertions=1`: Ubuntu's production
+php.ini sets -1, and the CVE-2026-109619 check relies on
+`PHP_VALUE=zend.assertions=-1` warning before request startup.
 
 | Check | Patch |
 | --- | --- |

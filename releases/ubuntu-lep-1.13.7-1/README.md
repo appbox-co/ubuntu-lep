@@ -2,8 +2,11 @@
 
 Security rebuild for the PHP release of 21 October 2026 (multipart/form-data
 parsing fixes). The image is the deployed ubuntu-lep image, `repo.cylo.net/ubuntu-lep@sha256:bf9d02be675f92934acbbc976632e5f8336fdedcfabc000bc512b4c4a94a11fb` (Ubuntu 18.04, php7.2 7.2.5), with only the PHP packages
-replaced; the PHP branch, web server, scripts and default configuration stay
-as deployed. It is published as `repo.cylo.net/ubuntu-lep:1.13.7-1` (a new immutable tag).
+replaced; the PHP branch, web server and default configuration stay as
+deployed. The entrypoint is the deployed one plus `mkdir -p /run/php` on every
+start (scripts/Entrypoint.sh), because the platform now mounts a fresh tmpfs
+on /run in every container it creates and php-fpm needs /run/php for its
+socket. It is published as `repo.cylo.net/ubuntu-lep:1.13.7-1` (a new immutable tag).
 
 ## 1. Is the patched PHP available?
 

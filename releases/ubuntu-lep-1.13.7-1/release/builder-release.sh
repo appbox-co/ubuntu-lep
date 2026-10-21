@@ -82,7 +82,7 @@ archive="$stage/context.tgz"
 git -C "$repo" archive --format=tar.gz --output="$archive" "$commit:$context_path"
 echo "context $commit:$context_path"
 tar -tzf "$archive" | sed 's/^/  /'
-if tar -tzf "$archive" | grep -v -E '^(\./)?(Dockerfile|\.dockerignore|README\.md|release/.*|php72-patches/.*)$' | grep -q .; then
+if tar -tzf "$archive" | grep -v -E '^(\./)?(Dockerfile|\.dockerignore|README\.md|release/.*|php72-patches/.*|scripts/|scripts/Entrypoint\.sh)$' | grep -q .; then
     fail "unexpected files in the build context"
 fi
 archive_sha=$(shasum -a 256 "$archive" | awk '{print $1}')

@@ -2,8 +2,10 @@
 # image (Ubuntu 18.04, nginx + php-fpm7.2 7.2.5, built 2018-06-08) with its
 # php7.2 packages replaced by Ubuntu 18.04's last public php7.2 source package
 # (7.2.24-0ubuntu0.18.04.17) rebuilt with the local patches in
-# php72-patches/. Nginx, supervisor, the entrypoint, the default
-# configuration and the PHP branch are unchanged.
+# php72-patches/. Nginx, supervisor, the default configuration and the PHP
+# branch are unchanged. The entrypoint (scripts/Entrypoint.sh) is the deployed
+# one plus `mkdir -p /run/php` on every start, because the platform mounts a
+# fresh tmpfs on /run in every container it creates.
 #
 # The php72-build stage is copied verbatim from CyloTech/rutorrent-app branch
 # php72-multipart-fix (the same patches and the same build arguments give the
@@ -79,3 +81,5 @@ RUN --mount=type=bind,from=php72-build,source=/build,target=/tmp/php72 \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*; \
     php-fpm7.2 -t
+
+COPY --chmod=0777 scripts/Entrypoint.sh /scripts/Entrypoint.sh

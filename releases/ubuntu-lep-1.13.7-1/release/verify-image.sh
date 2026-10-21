@@ -265,10 +265,17 @@ if [ -s "$work/changed-files" ]; then
     echo "files whose content changed:"
     sed 's/^/  /' "$work/changed-files"
     if grep -v -E "${GATE_CONTENT_CHANGE_ALLOWED:-^$}" "$work/changed-files" | grep -q .; then
-        fail "configuration or scripts changed outside the allowed PHP ini files"
+        fail "configuration or scripts changed outside the allowed files"
     fi
-    warn "PHP's packaged ini defaults changed (allowed by gate.conf)"
+    warn "allowed files changed (gate.conf GATE_CONTENT_CHANGE_ALLOWED)"
 fi
+for entry in "${GATE_FILE_SHA256[@]+"${GATE_FILE_SHA256[@]}"}"; do
+    want=${entry%% *}
+    path=${entry#* }
+    got=$(grep -F "  $path" "$work/image.files" | grep "^[0-9a-f]\{64\}  $path\$" | cut -d' ' -f1)
+    [ "$got" = "$want" ] || fail "$path has sha256 '$got', expected $want"
+    echo "$path is the gated file ($want)"
+done
 echo "$(grep -c '^[0-9a-f]\{64\}  ' "$work/image.files") files under ${GATE_IMAGE_CONFIG_ROOTS[*]} have the same paths, modes and owners"
 
 section "Multipart upload through the CLI built-in server"
@@ -301,10 +308,16 @@ volume_index "$GATE_DOCROOT" >/dev/null
 for path in "${GATE_CONFIG_VOLUMES[@]}"; do volume_index "$path" >/dev/null; done
 
 create_container() {
-    # create_container <name> <image> <volume-set>: created like the platform
-    # does (init, the app's volumes), not started yet.
+    # create_container <name> <image> <volume-set> [platform]: created like
+    # the platform does (init, the app's volumes and, with "platform", the
+    # tmpfs mounts new containers get), not started yet.
     local name=$1 image=$2 set=$3 i=0 path
     local args=(docker create --name "$name" --init --platform linux/amd64 --network "$GATE_RUN_NETWORK")
+    if [ "${4:-}" = platform ]; then
+        for path in "${GATE_RUN_TMPFS[@]+"${GATE_RUN_TMPFS[@]}"}"; do
+            args+=(--tmpfs "$path")
+        done
+    fi
     for path in "${GATE_RUN_ENV[@]+"${GATE_RUN_ENV[@]}"}"; do
         args+=(-e "$path")
     done
@@ -431,8 +444,8 @@ remove_container "$prefix-ref1"
 remove_container "$prefix-upd1"
 
 create_container "$prefix-ref2" "$GATE_BASE_IMAGE" ref
-create_container "$prefix-upd2" "$image_ref" upd
-create_container "$prefix-new" "$image_ref" new
+create_container "$prefix-upd2" "$image_ref" upd platform
+create_container "$prefix-new" "$image_ref" new platform
 docker start "$prefix-ref2" "$prefix-upd2" "$prefix-new" >/dev/null
 wait_ready "$prefix-ref2" site
 wait_ready "$prefix-upd2" site
@@ -450,6 +463,13 @@ snapshot_config "$prefix-upd2" > "$work/upd.config-volumes"
 diff -u "$work/ref.config-volumes" "$work/upd.config-volumes" \
     || fail "after the update the configuration volumes differ from the deployed image's"
 echo "configuration volumes after the update are identical to the deployed image's ($(grep -c . "$work/upd.config-volumes") entries)"
+
+section "Restart of the updated container (fresh tmpfs mounts)"
+docker restart -t 30 "$prefix-upd2" >/dev/null
+wait_ready "$prefix-upd2" site
+check_site "$prefix-upd2"
+check_services "$prefix-upd2"
+echo "the updated container serves PHP again after a restart"
 
 section "Fresh install"
 wait_ready "$prefix-new"

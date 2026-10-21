@@ -29,9 +29,15 @@ git push origin php-multipart-fix
 releases/ubuntu-lep-1.13.7-1/release/builder-release.sh release
 ```
 
+The php72-build stage, `php72-patches/0001-CVE-2026-109618-109619.patch`
+(sha256 e47e252a8702d23dfee026948cc4a8979f119a9478a024e03d4903889f3fd4e7)
+and the regression checks come from rutorrent-app e5de63e2; the local
+version suffix is `+cylo2`, so every php7.2 package is
+`7.2.24-0ubuntu0.18.04.17+cylo2`.
+
 `builder-release.sh` refuses uncommitted or unpushed work, archives this
-directory from the pushed commit, builds on the Appbox builder with
-`--platform linux/amd64`, runs `release/verify-image.sh` and pushes only if
+directory from the pushed commit, builds on builder1 (port 10112) with
+`--no-cache --platform linux/amd64`, runs `release/verify-image.sh` and pushes only if
 the gate passes, then prints the pushed digest. `builder-release.sh trial`
 does the same as a local `local/<image>-trial:<tag>` image with the trial
 build arguments in `release/gate.conf` and never pushes.

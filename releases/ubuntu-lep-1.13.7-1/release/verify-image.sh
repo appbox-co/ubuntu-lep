@@ -132,7 +132,9 @@ label_source=$(jq -r '."net.cylo.php-source-package" // empty' <<< "$labels")
 # slow part on a busy builder).
 section "Probing the base image and the candidate"
 probe() {
-    docker run --rm --network none --platform linux/amd64 -v "$release_dir:/gate:ro" \
+    # The regression checks copied from rutorrent-app read their helpers from
+    # /release/regression/lib, so the release directory is mounted there too.
+    docker run --rm --network none --platform linux/amd64 -v "$release_dir:/gate:ro" -v "$release_dir:/release:ro" \
         --entrypoint sh "$1" /gate/probe.sh "$php" "${GATE_FPM_BIN:--}" "$2" "${GATE_IMAGE_CONFIG_ROOTS[@]}"
 }
 probe "$GATE_BASE_IMAGE" base > "$work/base.probe" 2> "$work/base.probe.err" &
@@ -170,6 +172,16 @@ if [ -n "${GATE_PHP_VERSION_SUFFIX:-}" ]; then
         fail "some $GATE_PHP_SOURCE packages are not from the local rebuild ($GATE_PHP_VERSION_SUFFIX)"
     fi
 fi
+if [ -n "${GATE_PHP_EXACT_VERSION:-}" ]; then
+    [ "$min_version" = "$GATE_PHP_EXACT_VERSION" ] \
+        || fail "image label net.cylo.php-min-version is $min_version, expected $GATE_PHP_EXACT_VERSION"
+    if awk -F'|' -v v="$GATE_PHP_EXACT_VERSION" '$2 != v' "$work/image.php" | grep -q .; then
+        fail "some $GATE_PHP_SOURCE packages are not $GATE_PHP_EXACT_VERSION"
+    fi
+    echo "every $GATE_PHP_SOURCE package is $GATE_PHP_EXACT_VERSION"
+fi
+echo "installed $GATE_PHP_SOURCE packages:"
+sed 's/^/  /' "$work/image.php"
 if [ "${GATE_REQUIRE_LOCAL_PATCHES:-0}" = 1 ]; then
     part "$work/image.probe" local-patches > "$work/local-patches"
     echo "local patches built into $GATE_PHP_SOURCE: $(grep -c . "$work/local-patches" || true)"
@@ -203,9 +215,17 @@ section "PHP binaries and modules"
 version_line=$(part "$work/image.probe" php-version)
 echo "$version_line"
 case "$version_line" in
-    "PHP ${GATE_PHP_BRANCH}."*) ;;
-    *) fail "$php is not PHP $GATE_PHP_BRANCH" ;;
+    "PHP ${GATE_PHP_EXACT_VERSION:-${GATE_PHP_BRANCH}.}"*) ;;
+    *) fail "$php -v is not PHP ${GATE_PHP_EXACT_VERSION:-$GATE_PHP_BRANCH}" ;;
 esac
+if [ -n "${GATE_FPM_BIN:-}" ]; then
+    fpm_version_line=$(part "$work/image.probe" fpm-version)
+    echo "$fpm_version_line"
+    case "$fpm_version_line" in
+        "PHP ${GATE_PHP_EXACT_VERSION:-${GATE_PHP_BRANCH}.}"*) ;;
+        *) fail "$GATE_FPM_BIN -v is not PHP ${GATE_PHP_EXACT_VERSION:-$GATE_PHP_BRANCH}" ;;
+    esac
+fi
 if [ -n "${GATE_PHP_DEFAULT_CLI:-}" ]; then
     php_alternative=$(part "$work/image.probe" php-alternative)
     [ "$php_alternative" = "$GATE_PHP_DEFAULT_CLI" ] || fail "/usr/bin/php is $php_alternative, expected $GATE_PHP_DEFAULT_CLI"
@@ -374,6 +394,10 @@ check_site() {
     http "$name" info > "$work/$name.info" || { cat "$work/$name.info"; fail "$name does not serve the PHP page"; }
     grep -qx "sapi=${GATE_SAPI}" "$work/$name.info" || { head -3 "$work/$name.info"; fail "$name serves PHP through the wrong SAPI"; }
     grep -q "^version=${GATE_PHP_BRANCH}\." "$work/$name.info" || { head -3 "$work/$name.info"; fail "$name serves the wrong PHP branch"; }
+    if [ -n "${GATE_PHP_EXACT_VERSION:-}" ]; then
+        grep -qx "version=${GATE_PHP_EXACT_VERSION}" "$work/$name.info" \
+            || { head -3 "$work/$name.info"; fail "$name does not serve PHP $GATE_PHP_EXACT_VERSION"; }
+    fi
     grep -E '^(ext|zend)=' "$work/$name.info" > "$work/$name.modules"
     echo "$name: $(grep '^version=' "$work/$name.info") via $GATE_SAPI, $(wc -l < "$work/$name.modules") modules"
     http "$name" upload || fail "$name: multipart upload through the web server failed"

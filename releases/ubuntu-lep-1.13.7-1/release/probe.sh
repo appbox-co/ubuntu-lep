@@ -23,6 +23,8 @@ echo "### cli-modules"
 "$php" -m 2>/dev/null
 
 if [ "$fpm" != - ]; then
+    echo "### fpm-version"
+    "$fpm" -v 2>/dev/null | grep '^PHP ' | head -1
     echo "### fpm-modules"
     "$fpm" -m 2>/dev/null
     echo "### fpm-test"

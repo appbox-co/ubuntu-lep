@@ -10,9 +10,9 @@
 # same BuildKit cache). release/sync-php72-stage.sh <rutorrent-app commit>
 # refreshes it and php72-patches/ from a later commit of that branch.
 
-# --- php72-build stage from CyloTech/rutorrent-app 9f3b937751a5671154b7774b2027891149bf39a1 ---
+# --- php72-build stage from CyloTech/rutorrent-app e5de63e2fa9b74bdbfdf81a69fa47d3c3af0a4f9 (local suffix +cylo2) ---
 ARG PHP72_SOURCE_VERSION=7.2.24-0ubuntu0.18.04.17
-ARG PHP72_LOCAL_SUFFIX=+cylo1
+ARG PHP72_LOCAL_SUFFIX=+cylo2
 
 FROM ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98 AS php72-build
 ARG PHP72_SOURCE_VERSION
